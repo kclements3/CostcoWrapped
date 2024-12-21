@@ -10,43 +10,44 @@ import os
 # Items will be of the format: E? <numbers or whitespace> <letters and/or numbers> <letter or whitespace> <numbers or period>
 # Discounts are <numbers>/<numbers> <space> <text> -'
 
-member_ID = 'Replace with ID number on Receipt'
 out_dict = {'ID': [], 'Name': [], 'SaleOrItem': [], 'Amount': [], 'Date': []}
 
 # run this script from the same folder as your recipts
-files = os.listdir()
+files = os.listdir('Receipts')
 
 # Regex to match a normal item line
-item_regex = r'([E\s*])?(\d+)(\s)?(.+?)(\d+\.\d\d)'
+item_regex = r'([E\s*])?(\d+)(\s)?(.+?) (\d+\.\d\d)'
+item_regex_alt = r'([E\s*])?(\d+)(\s)?(.+?)(\d+\.\d\d)'  # No spaces between item & prices
+
 # Regex to match a sale  line
 sale_regex = r'(\d+)([/\s]+)?([\w\s\d]+) (\d*\.\d\d)'
+sale_regex_alt =r'(\d+)([/\s]+)?([\w\s\d]+?)(\d*\.\d\d)' # No spaces between item & prices
 
 # subtotal and tax currently unused, but could be added to another structure
 subtotal_regex = r'SUBTOTAL(.+)'
 tax_regex = r'TAX(.+)'
 
-# If an item is split into two lines, look for these patterns
-item_split1_re = r'([EF\s*])?(\d+)(\s)?(.+)'
-item_split2_re = r'(\s)?(.+?)(\d+\.\d\d)'
-
+cur_line = ''
 for file in files:
     stop_reading = False
     if file[-3:] == 'pdf':
         # Name of files is of the format Costco_########.pdf
         # the digits represent the date
         date_of_trip = file[7:-4]
-        with open(file, 'rb') as f:
+        with open('Receipts/'+file, 'rb') as f:
             reader = PdfReader(f)
             for page in reader.pages:
-                start_reading = False
+                if stop_reading:
+                    break
                 text = page.extract_text()
                 second_line = False  # flag to look for second line of multiline item
-                for line in text.splitlines():
-                    if member_ID in line and not start_reading:
-                        start_reading = True
-                        continue
-                    elif not start_reading or stop_reading:
-                        continue
+                start = re.search(r'Member[\n\s]\d+', text)
+                lines = text[start.span()[1]+1:].splitlines()
+
+                for line in lines[:-2]:
+                    if second_line:
+                        line = cur_line + line
+
                     subtot = re.search(subtotal_regex, line)
                     tax = re.search(tax_regex, line)
                     if '****' in line:
@@ -63,49 +64,40 @@ for file in files:
                         # sale item
                         sale = re.search(sale_regex, line)
                         if sale is None:
-                            print('Could not find sale', line, date_of_trip)
-                            continue
+                            sale = re.search(sale_regex_alt, line)
+                            if sale is None:
+                                print('Could not find sale', line, date_of_trip)
+                                continue
                         sale_groups = sale.groups()
                         out_dict['ID'].append(out_dict['ID'][-1])
                         out_dict['Name'].append(out_dict['Name'][-1])
                         out_dict['Date'].append(date_of_trip)
                         out_dict['Amount'].append(-float(sale_groups[3]))
                         out_dict['SaleOrItem'].append('Sale')
-                    elif start_reading:
-                        item = re.search(item_regex, line)
-                        if second_line or item is None:
-                            if 'https://' in line or 'Orders & Purchases' in line:
-                                # These lines can appear on multi-page receipts. Skip them
-                                start_reading = False
-                                continue
-                            # Line is split in two
-                            item1 = re.search(item_split1_re, line)
-                            item2 = re.search(item_split2_re, line)
-                            if item1 is not None and item2 is None:
-                                item1_groups = item1.groups()
-                                out_dict['ID'].append(item1_groups[1])
-                                out_dict['Name'].append(item1_groups[3])
-                                out_dict['Date'].append(date_of_trip)
-                                second_line = True
-                            elif item2 is not None:
-                                item2_groups = item2.groups()
-                                out_dict['Name'][-1] += item2_groups[1]
-                                out_dict['Amount'].append(item2_groups[2])
-                                out_dict['SaleOrItem'].append('Item')
-                                second_line = False
-                            else:
-                                print('Could not find item', line, date_of_trip)
-                        else:
-                            # Normal item line found
-                            item_groups = item.groups()
-                            out_dict['ID'].append(item_groups[1])
-                            out_dict['Name'].append(item_groups[3])
-                            out_dict['Date'].append(date_of_trip)
-                            out_dict['Amount'].append(float(item_groups[4]))
-                            out_dict['SaleOrItem'].append('Item')
+                    elif 'https://' in line or 'Orders & Purchases' in line:
+                        # These lines can appear on multi-page receipts. Skip them
+                        continue
                     else:
-                        print(line)
+                        # Normal item line
+                        item = re.search(item_regex, line)
+                        if item is None:
+                            item = re.search(item_regex_alt, line)
+                            if item is None:
+                                # Item is spit in 2
+                                second_line = True
+                                cur_line = line
+                                continue
+
+                        item_groups = item.groups()
+                        out_dict['ID'].append(item_groups[1])
+                        out_dict['Name'].append(item_groups[3])
+                        out_dict['Date'].append(date_of_trip)
+                        if float(item_groups[4]) > 1000.0:
+                            print('Double Check', line)
+                        out_dict['Amount'].append(float(item_groups[4]))
+                        out_dict['SaleOrItem'].append('Item')
+                        second_line = False
 
 
 out_pd = pd.DataFrame.from_dict(out_dict, dtype=str)
-out_pd.to_csv('CostcoData_%s.csv' % (member_ID))
+out_pd.to_csv('CostcoData.csv')

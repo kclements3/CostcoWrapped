@@ -1,7 +1,6 @@
 import pandas as pd
 
-member_ID = 'Replace with Member ID'
-df = pd.read_csv('CostcoData_%s.csv'%(member_ID))
+df = pd.read_csv('CostcoData.csv')
 
 unique_ids=set(df['ID'])
 out_dict = {'ID': [], 'Name': [], 'Amount': [], 'Times Purchased': []}
