@@ -1,6 +1,6 @@
 import pandas as pd
 
-df = pd.read_csv('CostcoData.csv')
+df = pd.read_csv('CostcoData2025_edited.csv')
 
 unique_ids=set(df['ID'])
 out_dict = {'ID': [], 'Name': [], 'Amount': [], 'Times Purchased': []}
@@ -12,4 +12,4 @@ for ID in unique_ids:
     out_dict['Times Purchased'].append(len(df_id.loc[df_id['SaleOrItem']=='Item']))
 
 out_pd = pd.DataFrame.from_dict(out_dict)
-out_pd.to_csv('CostcoSummary.csv')
+out_pd.to_csv('CostcoSummary2025.csv')
