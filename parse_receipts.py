@@ -2,6 +2,10 @@ from pypdf import PdfReader
 import regex as re
 import pandas as pd
 import os
+from tkinter import *
+from tkinter import filedialog
+from PIL import Image, ImageTk
+import tkinter.font as tkFont
 
 
 # Record Item number, Item name, and price (including discount)
@@ -95,6 +99,7 @@ def parse_receipts(receipt_dir):
                             out_dict['Name'].append(item_groups[3])
                             out_dict['Date'].append(date_of_trip)
                             if float(item_groups[4]) > 1000.0:
+                                lb.insert(END, 'Double Check {} from {}'.format(line, date_of_trip))
                                 print('Double Check', line)
                             out_dict['Amount'].append(float(item_groups[4]))
                             out_dict['SaleOrItem'].append('Item')
@@ -102,7 +107,11 @@ def parse_receipts(receipt_dir):
 
 
     out_pd = pd.DataFrame.from_dict(out_dict, dtype=str)
-    out_pd.to_csv('CostcoData2025.csv')
+    out_pd.to_csv('CostcoData2025.csv', index=False)
+    parse_gas(receipt_dir + '/gas')
+    check_val_label.config(text='Processing Complete! Check all values in CostcoData2025_test.csv. Gas is in CostcoGas2025.csv.')
+    comp_button['state'] = NORMAL
+
 
 def parse_gas(receipt_dir):
     out_dict = {'Pump': [], 'Gallons': [], 'Price': [], 'Total': [], 'Date': []}
@@ -134,9 +143,98 @@ def parse_gas(receipt_dir):
     out_pd = pd.DataFrame.from_dict(out_dict, dtype=str)
     out_pd.to_csv('CostcoGas2025.csv',index=False)
 
-if __name__ == '__main__':
-    receipt_dir = 'Receipts2025'
-    parse_receipts(receipt_dir)
 
-    gas_dir = receipt_dir + '/gas'
-    parse_gas(gas_dir)
+def browse_folder():
+    """Opens a folder selection dialog and prints the selected path."""
+    f = filedialog.askdirectory()
+    receipt_dir.set(f)
+    if receipt_dir:  # Check if a folder was selected (not cancelled)
+        folder_label.config(text=receipt_dir.get())
+        process_button['state'] = NORMAL
+
+def compile_results():
+    df = pd.read_csv('CostcoData2025.csv')
+
+    unique_ids=set(df['ID'])
+    out_dict = {'ID': [], 'Name': [], 'Amount': [], 'Times Purchased': []}
+    for ID in unique_ids:
+        df_id =df.loc[df['ID']==ID, :]
+        out_dict['ID'].append(ID)
+        out_dict['Name'].append(df_id['Name'].iloc[0])
+        out_dict['Amount'].append(sum(df_id['Amount']))
+        out_dict['Times Purchased'].append(len(df_id.loc[df_id['SaleOrItem']=='Item']))
+
+    out_pd = pd.DataFrame.from_dict(out_dict)
+    out_pd.to_csv('CostcoSummary2025.csv', index=False)
+    success_label=Label(root, text='Results are compiled in CostcoSummary.csv!')
+    success_label.grid(column=0, row=6, sticky=W)
+    # success_label.configure(bg='white')
+
+def create_grid(root):
+    global folder_label
+    global process_button
+    global check_val_label
+    global comp_button
+    global lb
+    rows = 5
+    cols = 2
+
+    # First Row
+    Label(root, text='After downloading all receipts to the your “receipts” folder, select it:').grid(column=0, row=1, sticky=W)
+
+    # Create a button to trigger the folder browsing
+    browse_button = Button(root, text="Browse Folder", command=browse_folder)
+    browse_button.grid(column=1, row=1, sticky=W)
+
+    # Second Row
+    folder_label = Label(root, text='Select Folder')
+    folder_label.grid(column=0, row=2, sticky=W)
+    process_button = Button(root, text="Process Receipts", command= lambda: parse_receipts(receipt_dir.get()))
+    process_button.grid(column=1, row=2, sticky=W)
+    # process_button.configure(bg='white')
+    process_button['state'] = DISABLED
+
+    # Third Row
+    check_val_label = Label(root, text='Select Folder')
+    check_val_label.grid(column=0, row=3, sticky=W, columnspan=2)
+
+    # Fourth Row: list any items needing double checking
+    lb = Listbox(root, width=50)
+    lb.grid(column=0, row=4, columnspan=2, sticky=W)
+
+    # Fourth Row
+    temp=Label(root, text='If all looks good, compile results:')
+    temp.grid(column=0, row=5, sticky=W)
+    # temp.configure(bg='white')
+
+    comp_button = Button(root, text="Compile", command= compile_results)
+    comp_button.grid(column=1, row=5, sticky=W)
+    # comp_button.configure(bg='white')
+    comp_button['state'] = DISABLED
+
+
+if __name__ == '__main__':
+    # Read in logo
+    image_path = "img/Wrapped_img.png"
+    original_image = Image.open(image_path)
+    resized_image = original_image.resize((230, 130), Image.LANCZOS)
+
+    # Main window
+    root = Tk()
+
+    # Add image logo
+    tk_image = ImageTk.PhotoImage(resized_image)
+    image_label = Label(root, image=tk_image)
+    image_label.grid(row=0,column=0, columnspan=2)
+
+    # Get the default font object
+    default_font = tkFont.nametofont("TkDefaultFont")
+
+    # Configure the default font
+    default_font.configure(family="Futura", size=12)
+
+    root.title("Costco Wrapped")
+    receipt_dir = StringVar()
+    create_grid(root)
+
+    root.mainloop()
