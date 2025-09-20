@@ -32,10 +32,12 @@ def parse_receipts(receipt_dir):
     # subtotal and tax currently unused, but could be added to another structure
     subtotal_regex = r'SUBTOTAL(.+)'
     tax_regex = r'TAX(.+)'
+    date_regex = r'\d\d/\d\d/\d\d\d\d'
 
     cur_line = ''
     for file in files:
         stop_reading = False
+        stop_items = False
         if file[-3:] == 'pdf':
             # Name of files is of the format Costco_########.pdf
             # the digits represent the date
@@ -57,8 +59,7 @@ def parse_receipts(receipt_dir):
                         subtot = re.search(subtotal_regex, line)
                         tax = re.search(tax_regex, line)
                         if '****' in line:
-                            stop_reading = True
-                            break
+                            stop_items = True
                         elif subtot is not None:
                             subtotal = subtot.groups()[-1].strip()
                             continue
@@ -66,7 +67,15 @@ def parse_receipts(receipt_dir):
                             tax = tax.groups()[-1].strip()
                             continue
 
-                        if re.match(r'\d-', line[-2:]) is not None:
+                        if stop_items:
+                            # Done reading items, get total and date
+                            date = re.search(date_regex, line)
+                            if date is not None:
+                                d = line[date.start():date.end()]
+                                out_dict['Date'] += [d]*(len(out_dict['Name']) - len(out_dict['Date']))
+                                stop_reading = True
+                                break
+                        elif re.match(r'\d-', line[-2:]) is not None:
                             # sale item
                             sale = re.search(sale_regex, line)
                             if sale is None:
@@ -77,7 +86,6 @@ def parse_receipts(receipt_dir):
                             sale_groups = sale.groups()
                             out_dict['ID'].append(out_dict['ID'][-1])
                             out_dict['Name'].append(out_dict['Name'][-1])
-                            out_dict['Date'].append(date_of_trip)
                             out_dict['Amount'].append(-float(sale_groups[3]))
                             out_dict['SaleOrItem'].append('Sale')
                         elif 'https://' in line or 'Orders & Purchases' in line:
@@ -97,7 +105,6 @@ def parse_receipts(receipt_dir):
                             item_groups = item.groups()
                             out_dict['ID'].append(item_groups[1])
                             out_dict['Name'].append(item_groups[3])
-                            out_dict['Date'].append(date_of_trip)
                             if float(item_groups[4]) > 1000.0:
                                 lb.insert(END, 'Double Check {} from {}'.format(line, date_of_trip))
                                 print('Double Check', line)
@@ -125,7 +132,6 @@ def parse_gas(receipt_dir):
         if file[-3:] == 'pdf':
             # Name of files is of the format Costco_########.pdf
             # the digits represent the date
-            date_of_trip = file[4:-4]
             with open(receipt_dir+'/'+file, 'rb') as f:
                 reader = PdfReader(f)
                 for page in reader.pages:
@@ -135,6 +141,9 @@ def parse_gas(receipt_dir):
                     text_split = text.splitlines()
                     info_ind = text_split.index('Pump Gallons Price') + 1
                     pump, gallons, price = text_split[info_ind].split(' ')
+                    for line in text_split:
+                        if line[0:4] == 'Date':
+                            date_of_trip = line[6:]
                     out_dict['Date'].append(date_of_trip)
                     out_dict['Pump'].append(pump)
                     out_dict['Gallons'].append(gallons)
