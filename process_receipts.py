@@ -109,8 +109,8 @@ class ProcessReceipts:
 
         out_pd = pd.DataFrame.from_dict(self.out_dict, dtype=str)
         summary_pd = pd.DataFrame.from_dict(self.summary_dict, dtype=str)
-        out_pd.to_csv('CostcoData2025.csv', index=False)
-        summary_pd.to_csv('CostcoDataSummary2025.csv', index=False)
+        out_pd.to_csv(f'{receipt_dir}/../CostcoItemData.csv', index=False)
+        summary_pd.to_csv(f'{receipt_dir}/../CostcoDataTripSummary.csv', index=False)
         self.parse_gas(receipt_dir + '/gas')
         self.receipts_processed = True
 
@@ -145,11 +145,11 @@ class ProcessReceipts:
                         out_dict['Price'].append(price)
                         out_dict['Total'].append(float(gallons)*float(price[1:]))
         out_pd = pd.DataFrame.from_dict(out_dict, dtype=str)
-        out_pd.to_csv('CostcoGas2025.csv',index=False)
+        out_pd.to_csv(f'{receipt_dir}/../../CostcoGas.csv',index=False)
 
 
-    def compile_results(self):
-        df = pd.read_csv('CostcoData2025.csv')
+    def compile_results(self, receipt_dir):
+        df = pd.read_csv(f'{receipt_dir}/../CostcoItemData.csv')
 
         unique_ids=set(df['ID'])
         out_dict = {'ID': [], 'Name': [], 'Amount': [], 'Times Purchased': []}
@@ -161,5 +161,5 @@ class ProcessReceipts:
             out_dict['Times Purchased'].append(len(df_id.loc[df_id['SaleOrItem']=='Item']))
 
         out_pd = pd.DataFrame.from_dict(out_dict)
-        out_pd.to_csv('CostcoSummary2025.csv', index=False)
+        out_pd.to_csv(f'{receipt_dir}/../CostcoItemsCompiled.csv', index=False)
         self.results_compiled = True
