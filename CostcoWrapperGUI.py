@@ -6,7 +6,6 @@ from PIL import Image, ImageTk
 import tkinter.font as tkFont
 import pickle as pkl
 
-# from process_receipts import *
 from process_receipts import ProcessReceipts
 
 
