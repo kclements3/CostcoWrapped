@@ -13,8 +13,8 @@ class ProcessReceipts:
         self.item_regex_alt = r'([E\s*])?(\d+)(\s)?(.+?)(\d+\.\d\d)'  # No spaces between item & prices
 
         # Regex to match a sale  line
-        self.sale_regex = r'(\d+)([/\s]+)?([\w\s\d]+) (\d*\.\d\d)'
-        self.sale_regex_alt = r'(\d+)([/\s]+)?([\w\s\d]+?)(\d*\.\d\d)'  # No spaces between item & prices
+        self.sale_regex = r'(\d+)([/\s]+)?([\w\s\d\']+) (\d*\.\d\d)'
+        self.sale_regex_alt = r'(\d+)([/\s]+)?([\w\s\d\']+?)(\d*\.\d\d)'  # No spaces between item & prices
 
         # subtotal and tax currently unused, but could be added to another structure
         self.subtotal_regex = r'SUBTOTAL(.+)'
